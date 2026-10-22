@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "skipLibCheck": true
+  },
+  "include": ["src", "test", "types"],
+  "exclude": ["test/**/fixture/**", "test/**/fixtures/**"]
+}
