@@ -110,18 +110,40 @@ function isReverificationHint(answer: unknown): boolean {
   );
 }
 
-/** Runs the action; a thrown API error that asks for a verification becomes the same answer a returned hint is. */
-async function settle(run: () => unknown): Promise<unknown> {
+/**
+ * The body to look for Clerk's hint in. A `Response` is read from a clone, so the caller still gets the original with
+ * its body unread; a body that is not JSON (a 204, text, HTML) or was already read holds no hint.
+ */
+async function hintBodyOf(value: unknown): Promise<unknown> {
+  if (!(value instanceof Response)) return value;
+  try {
+    return await value.clone().json();
+  } catch {
+    // Not JSON, empty, or already consumed: there is no hint in it, so the response is the action's answer as it is.
+    return undefined;
+  }
+}
+
+/** The action's outcome: what it returned, and the body that is checked for a verification hint. */
+interface Settled {
+  readonly value: unknown;
+  readonly hint: unknown;
+}
+
+/** Runs the action; a thrown API error that asks for a verification becomes the same hint a returned one is. */
+async function settle(run: () => unknown): Promise<Settled> {
   try {
     const value = await run();
-    return value instanceof Response ? await value.json() : value;
+    return { value, hint: await hintBodyOf(value) };
   } catch (error) {
     const errors = fieldOf(error, "errors");
     const asksForVerification =
       Array.isArray(errors) &&
       errors.some((item) => fieldOf(item, "code") === SESSION_REVERIFICATION);
-    if (asksForVerification)
-      return { clerk_error: { type: "forbidden", reason: "reverification-error" } };
+    if (asksForVerification) {
+      const hint = { clerk_error: { type: "forbidden", reason: "reverification-error" } };
+      return { value: hint, hint };
+    }
     throw error;
   }
 }
@@ -161,7 +183,8 @@ function requestVerification(clerk: ClerkLike | null, level: string | undefined)
  * The answer counts as "verify again" when it is Clerk's hint (`{ clerk_error: { type: "forbidden", reason:
  * "reverification-error" } }`), or when the action throws an error whose `errors` list holds the code
  * `session_reverification_required`. Any other thrown error rejects the wrapped action unchanged. An answer that is a
- * `Response` is read with `response.json()`, and the parsed body is what the wrapped action resolves to.
+ * `Response` is looked at through a clone (`response.clone().json()`) for the hint only, and the original `Response`,
+ * body unread, is what the wrapped action resolves to; a body that is not JSON is never a hint and never an error.
  *
  * @param fetcher The action. It may return the server's answer, or throw Clerk's API error.
  * @returns The wrapped action, with the same arguments. It resolves to the answer of the last run.
@@ -207,15 +230,15 @@ export function useReverification<A extends readonly unknown[], R>(
   const clerk = useClerk();
   const run = async (...args: A): Promise<unknown> => {
     let answer = await settle(() => fetcher(...args));
-    if (isReverificationHint(answer)) {
-      const reverification = fieldOf(fieldOf(answer, "clerk_error"), "metadata");
+    if (isReverificationHint(answer.hint)) {
+      const reverification = fieldOf(fieldOf(answer.hint, "clerk_error"), "metadata");
       await requestVerification(
         untrack(() => clerk()),
         levelOf(fieldOf(reverification, "reverification")),
       );
       answer = await settle(() => fetcher(...args));
     }
-    return answer;
+    return answer.value;
   };
   // The answer is the fetcher's own result (the resolved value), once the visitor has verified when asked.
   return run as (...args: A) => Promise<Awaited<R>>;

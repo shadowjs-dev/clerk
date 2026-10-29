@@ -1,3 +1,4 @@
+import { useMemo } from "@shadow-js/core";
 import { type AuthState, useAuth } from "./hooks";
 
 /**
@@ -65,6 +66,16 @@ export function clerkConvexAuth(options: ClerkConvexAuthOptions = {}): () => Con
   const template = options.template ?? "convex";
   return function useClerkConvexAuth(): ConvexAuthState {
     const auth: AuthState = useAuth();
+    // Convex re-registers when the fetcher it holds is replaced, and keeps the socket's identity until then. The token
+    // of the old fetcher still names the old account or organization, so a new fetcher is made whenever the user, the
+    // session, the organization or the role changes (not on every Clerk event: an equal emit keeps the same fetcher).
+    const fetcher = useMemo<ConvexAuthState["fetchAccessToken"]>(() => {
+      auth.userId();
+      auth.sessionId();
+      auth.orgId();
+      auth.orgRole();
+      return makeFetcher(auth, template);
+    });
     return {
       get isLoading() {
         return !auth.isLoaded();
@@ -72,19 +83,26 @@ export function clerkConvexAuth(options: ClerkConvexAuthOptions = {}): () => Con
       get isAuthenticated() {
         return auth.isSignedIn();
       },
-      fetchAccessToken: async ({ forceRefreshToken }) => {
-        // A failed request is answered with no token, as the contract says. A rejection would leave Convex waiting for
-        // a token that never comes, with its socket paused, so no query would settle.
-        try {
-          return await auth.getToken({ template, skipCache: forceRefreshToken });
-        } catch (error) {
-          console.warn(
-            "clerkConvexAuth: the Convex token request failed; Convex will ask again.",
-            error,
-          );
-          return null;
-        }
+      get fetchAccessToken() {
+        return fetcher();
       },
     };
+  };
+}
+
+/** One token fetcher for a given identity. A failed request is answered with no token, as the contract says. @internal */
+function makeFetcher(auth: AuthState, template: string): ConvexAuthState["fetchAccessToken"] {
+  return async ({ forceRefreshToken }) => {
+    // A rejection would leave Convex waiting for a token that never comes, with its socket paused, so no query would
+    // settle.
+    try {
+      return await auth.getToken({ template, skipCache: forceRefreshToken });
+    } catch (error) {
+      console.warn(
+        "clerkConvexAuth: the Convex token request failed; Convex will ask again.",
+        error,
+      );
+      return null;
+    }
   };
 }

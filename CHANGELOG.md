@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.3
+
+### Fixed
+
+- `ConvexProviderWithClerk` and `clerkConvexAuth` register a new token fetcher with Convex when the user, session, organization or organization role changes, so the socket no longer keeps the old account or organization claims until the token expires; sign-out still clears auth.
+- `useReverification` resolves to the original `Response` (body unread) instead of its parsed body; it reads a clone only to look for the reverification hint, so a 204 or non-JSON success no longer rejects after the side effect ran.
+
 ## 1.0.2
 
 ### Fixed

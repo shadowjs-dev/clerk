@@ -5,7 +5,7 @@ description: "Work with @shadow-js/clerk. Clerk authentication for your app, wit
 
 # @shadow-js/clerk
 
-Version 1.0.2. Clerk authentication for your app, with a provider, hooks, UI components and server helpers.
+Version 1.0.3. Clerk authentication for your app, with a provider, hooks, UI components and server helpers.
 
 ## Where to read more
 
@@ -26,9 +26,9 @@ npm install @shadow-js/clerk @shadow-js/core @shadow-js/web
 | `@clerk/backend` | `>=2` | no |
 | `@clerk/clerk-js` | `>=5` | no |
 | `@clerk/ui` | `>=1.39.1` | no |
-| `@shadow-js/convex` | `^1.0.2` | no |
-| `@shadow-js/core` | `^1.0.2` | yes |
-| `@shadow-js/web` | `^1.0.2` | yes |
+| `@shadow-js/convex` | `^1.0.3` | no |
+| `@shadow-js/core` | `^1.0.3` | yes |
+| `@shadow-js/web` | `^1.0.3` | yes |
 
 ## Import paths
 
