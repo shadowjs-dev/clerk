@@ -1,6 +1,6 @@
 import { cleanup, flush, render } from "@shadow-js/testing/dom";
 import { ErrorBoundary } from "@shadow-js/web";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { type AuthState, useAuth, useClerk } from "../src/index";
 import { ClerkProvider } from "../src/provider";
 import { KEY, LIVE_KEY, mountProvider } from "./support/app";
@@ -324,5 +324,56 @@ describe("ClerkProvider: sign-ins made in another tab", () => {
     cleanup();
     focusTab();
     expect(clerk.count("__internal_reloadInitialResources")).toBe(0);
+  });
+});
+
+describe("ClerkProvider: the cross-tab channel", () => {
+  /** Records the names of the BroadcastChannels opened, and delivers to the other channels of the same name. */
+  class RecordingChannel extends EventTarget {
+    static readonly names: string[] = [];
+    static readonly open = new Map<string, Set<RecordingChannel>>();
+    readonly name: string;
+    constructor(name: string) {
+      super();
+      this.name = name;
+      RecordingChannel.names.push(name);
+      const set = RecordingChannel.open.get(name) ?? new Set<RecordingChannel>();
+      set.add(this);
+      RecordingChannel.open.set(name, set);
+    }
+    postMessage(): void {
+      for (const other of RecordingChannel.open.get(this.name) ?? []) {
+        if (other !== this) other.dispatchEvent(new Event("message"));
+      }
+    }
+    close(): void {
+      RecordingChannel.open.get(this.name)?.delete(this);
+    }
+  }
+
+  const mountWithKey = (publishableKey: string): void => {
+    mountProvider(() => useAuth(), { clerk: new FakeClerk(), publishableKey });
+  };
+
+  it("[CLERK-R5-4] two keys that end in the same 16 characters open different channels; the same key opens the same one", () => {
+    RecordingChannel.names.length = 0;
+    RecordingChannel.open.clear();
+    vi.stubGlobal("BroadcastChannel", RecordingChannel);
+    try {
+      const tail = "ZXhhbXBsZS5jb20kXXXX";
+      const keyA = `pk_test_AAAAAAAA${tail}`;
+      const keyB = `pk_test_BBBBBBBB${tail}`;
+      expect(keyA.slice(-16)).toBe(keyB.slice(-16));
+      mountWithKey(keyA);
+      mountWithKey(keyB);
+      mountWithKey(keyA);
+      const [first, second, third] = RecordingChannel.names;
+      expect(RecordingChannel.names).toHaveLength(3);
+      expect(first).not.toBe(second);
+      expect(third).toBe(first);
+      expect(first).not.toContain(keyA);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

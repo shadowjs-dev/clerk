@@ -11,7 +11,7 @@ import {
 import { attempt } from "./internal/actions";
 import { ClerkContext, type ClerkContextValue } from "./internal/context";
 import { createFlowMirror, EMPTY_FLOWS } from "./internal/flow-mirror";
-import { checkPublishableKey } from "./internal/keys";
+import { checkPublishableKey, syncChannelName } from "./internal/keys";
 import { importClerkConstructor, importClerkUi, loadInstance, withClerkUi } from "./internal/load";
 import { loadClerkScripts, type ScriptOverrides } from "./internal/script";
 import { createSessionSync, type SessionSync } from "./internal/session-sync";
@@ -86,7 +86,9 @@ export interface ClerkProviderProps extends ScriptOverrides {
 /** The mode of the props, or the default. Anything else is a configuration mistake, reported before a load. */
 function checkMode(mode: ClerkProviderMode | undefined): ClerkProviderMode {
   if (mode === undefined || mode === "script" || mode === "bundled") return mode ?? "script";
-  throw new TypeError('ClerkProvider: mode must be "script" or "bundled".');
+  throw new TypeError(
+    __DEV__ ? 'ClerkProvider: mode must be "script" or "bundled".' : "CLERK_MODE",
+  );
 }
 
 /**
@@ -212,9 +214,13 @@ export function ClerkProvider(props: ClerkProviderProps): unknown {
       apply(snapshot(clerk), clerk);
       return;
     }
-    loadInstance(clerk, loadOptions).then(() => {
-      if (!disposed) apply(snapshot(clerk), clerk);
-    }, fail);
+    // `.catch` rather than a second `then` argument: a throw from applying the loaded state (an unreadable resource)
+    // must reach the boundary too, not become an unhandled rejection.
+    loadInstance(clerk, loadOptions)
+      .then(() => {
+        if (!disposed) apply(snapshot(clerk), clerk);
+      })
+      .catch(fail);
   };
 
   /** Aborts the Clerk script loads of this provider when it is disposed. Created on mount. */
@@ -256,7 +262,7 @@ export function ClerkProvider(props: ClerkProviderProps): unknown {
     onMount(() => {
       if (typeof window !== "undefined" && typeof document !== "undefined") {
         const created = createSessionSync({
-          name: publishableKey.slice(-16),
+          name: syncChannelName(publishableKey),
           clerk: () => current,
         });
         sync = created;

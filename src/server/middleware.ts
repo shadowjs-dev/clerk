@@ -45,7 +45,7 @@ export interface ClerkMiddlewareOptions extends ClerkServerOptions {
     /**
      * A same-app path such as `/sign-in`, optionally with its own query and fragment: it starts with one `/` and has
      * no whitespace, control character or backslash. Anything else throws a `TypeError` when the middleware is
-     * created. Without it, the answer is a `401`.
+     * created. A request for this page itself is never redirected, even when the matcher covers it. Without it, the answer is a `401`.
      */
     readonly signInUrl?: string;
   };
@@ -102,16 +102,39 @@ export function clerkMiddleware(options: ClerkMiddlewareOptions): ClerkMiddlewar
     protection?.signInUrl === undefined
       ? undefined
       : checkedAppPath(protection.signInUrl, "protect.signInUrl");
+  // The sign-in page is never protected from itself: a matcher such as `/(.*)` covers it, and redirecting it to itself
+  // would add one more level of `redirect_url` on every hop until the browser gives up.
+  const signInPath = signInUrl === undefined ? undefined : pathOfPath(signInUrl);
   return async (event, next) => {
     const auth = await authenticateRequest(event.request, checked);
     authByEvent.set(event, auth);
     const handshake = handshakeResponse(auth);
     if (handshake !== undefined) return handshake;
-    if (protection !== undefined && !auth.isSignedIn && covers(protection.matcher, event)) {
+    if (
+      protection !== undefined &&
+      !auth.isSignedIn &&
+      covers(protection.matcher, event) &&
+      !isSignInPage(event, signInPath)
+    ) {
       return protectedAnswer(event.request, signInUrl);
     }
     return withAnswerHeaders(await next(), auth.headers);
   };
+}
+
+/** The pathname of an app path (`/sign-in?lang=ar` gives `/sign-in`), without a trailing slash. */
+function pathOfPath(path: string): string {
+  return trimSlash(new URL(path, "http://app.invalid").pathname);
+}
+
+function trimSlash(pathname: string): string {
+  return pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+}
+
+/** Whether the request, and the URL the framework moved the event to, are both the sign-in page `protect` redirects to. */
+function isSignInPage(event: ClerkMiddlewareEvent, signInPath: string | undefined): boolean {
+  const urls = [new URL(event.request.url), ...(event.url === undefined ? [] : [event.url])];
+  return signInPath !== undefined && urls.every((url) => trimSlash(url.pathname) === signInPath);
 }
 
 /** Whether the rule covers the request, or the URL the framework moved the event to. */

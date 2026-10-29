@@ -1,6 +1,6 @@
 {
   "name": "@shadow-js/clerk",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Clerk authentication for your app, with a provider, hooks, UI components and server helpers",
   "license": "MIT",
   "type": "module",
@@ -49,9 +49,9 @@
     "@clerk/backend": ">=2",
     "@clerk/clerk-js": ">=5",
     "@clerk/ui": ">=1.39.1",
-    "@shadow-js/convex": "^1.0.1",
-    "@shadow-js/core": "^1.0.1",
-    "@shadow-js/web": "^1.0.1"
+    "@shadow-js/convex": "^1.0.2",
+    "@shadow-js/core": "^1.0.2",
+    "@shadow-js/web": "^1.0.2"
   },
   "peerDependenciesMeta": {
     "@clerk/backend": {
@@ -72,14 +72,15 @@
     "@clerk/backend": "3.23.1",
     "@clerk/clerk-js": "6.38.1",
     "@clerk/ui": "1.39.1",
-    "@shadow-js/compiler": "^1.0.1",
-    "@shadow-js/convex": "^1.0.1",
-    "@shadow-js/core": "^1.0.1",
-    "@shadow-js/router": "^1.0.1",
-    "@shadow-js/testing": "^1.0.1",
-    "@shadow-js/web": "^1.0.1",
+    "@shadow-js/compiler": "^1.0.2",
+    "@shadow-js/convex": "^1.0.2",
+    "@shadow-js/core": "^1.0.2",
+    "@shadow-js/router": "^1.0.2",
+    "@shadow-js/testing": "^1.0.2",
+    "@shadow-js/web": "^1.0.2",
     "@testing-library/dom": "10.4.2",
     "@types/node": "^24.0.0",
+    "esbuild": "0.27.0",
     "fast-check": "^4.10.2",
     "happy-dom": "^21.0.3",
     "tsdown": "0.23.0",

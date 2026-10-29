@@ -82,7 +82,9 @@ export function frontendApiOf(publishableKey: string): string {
   const host = decoded.endsWith("$") ? decoded.slice(0, -1) : "";
   if (!HOST_PATTERN.test(host)) {
     throw new TypeError(
-      "ClerkProvider: publishableKey does not name a Clerk frontend API. Copy the key again from the Clerk dashboard.",
+      __DEV__
+        ? "ClerkProvider: publishableKey does not name a Clerk frontend API. Copy the key again from the Clerk dashboard."
+        : "CLERK_KEY",
     );
   }
   return host;
@@ -117,7 +119,11 @@ export function clerkUIScriptUrl(host: string, overrides: ScriptOverrides): stri
 function versionOf(prop: string, given: string | undefined, fallback: string): string {
   const version = given ?? fallback;
   if (!VERSION_PATTERN.test(version)) {
-    throw new TypeError(`ClerkProvider: ${prop} must be a version such as "6" or "6.38.1".`);
+    throw new TypeError(
+      __DEV__
+        ? `ClerkProvider: ${prop} must be a version such as "6" or "6.38.1".`
+        : `CLERK_VERSION ${prop}`,
+    );
   }
   return version;
 }
@@ -221,13 +227,19 @@ function httpUrl(prop: string, value: string): string {
   try {
     url = new URL(value, window.location.href);
   } catch {
-    throw new TypeError(`ClerkProvider: ${prop} is not a valid URL.`);
+    throw new TypeError(
+      __DEV__ ? `ClerkProvider: ${prop} is not a valid URL.` : `CLERK_URL_1 ${prop}`,
+    );
   }
   const own =
     /^(localhost|127\.0\.0\.1|\[::1\]|.+\.localhost)$/.test(url.hostname) ||
     url.origin === window.location.origin;
   if (url.protocol !== "https:" && !(url.protocol === "http:" && own)) {
-    throw new TypeError(`ClerkProvider: ${prop} must be https (http only for localhost).`);
+    throw new TypeError(
+      __DEV__
+        ? `ClerkProvider: ${prop} must be https (http only for localhost).`
+        : `CLERK_URL_2 ${prop}`,
+    );
   }
   return url.href;
 }
@@ -264,15 +276,24 @@ async function ensureScript(spec: ScriptSpec): Promise<void> {
 }
 
 /**
+ * How many pending attempts wait on each script element. Providers share one element per bundle, so a provider that is
+ * canceled must not take away the element another one is still waiting on. A `WeakMap` keyed by the element: it holds
+ * nothing once the element is gone.
+ */
+const waiters = new WeakMap<HTMLScriptElement, number>();
+
+/**
  * One attempt. It inserts the script, or waits for a copy already in the document, and settles when
  * the global appears, the script errors, or the timeout passes. Every path clears its timers and
- * listeners. A failed or canceled attempt removes its element, so the retry inserts a fresh one.
+ * listeners. A failed attempt removes its element, so the retry inserts a fresh one. A canceled attempt (its provider
+ * was unmounted) removes the element only when no other attempt waits on it.
  */
 function loadOnce(spec: ScriptSpec): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const host = new URL(spec.url).host;
     const existing = document.querySelector<HTMLScriptElement>(`script[${spec.marker}]`);
     const script = existing ?? createScript(spec);
+    waiters.set(script, (waiters.get(script) ?? 0) + 1);
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let poll: ReturnType<typeof setInterval> | undefined;
@@ -285,11 +306,13 @@ function loadOnce(spec: ScriptSpec): Promise<void> {
       spec.signal.removeEventListener("abort", onAbort);
       script.removeEventListener("load", onLoad);
       script.removeEventListener("error", onError);
+      const others = (waiters.get(script) ?? 1) - 1;
+      waiters.set(script, others);
       if (failure === undefined) {
         resolve();
         return;
       }
-      script.remove();
+      if (failure !== "canceled" || others === 0) script.remove();
       failureOf(failure, spec, host).then(reject, reject);
     };
     const onAbort = (): void => settle("canceled");

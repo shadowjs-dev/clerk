@@ -21,8 +21,9 @@ export const EMPTY_FLOWS: ClerkFlowSnapshots = {
 };
 
 /** The message for a clerk-js without the future state, written once per mirror. */
-const MISSING_STATE =
-  "@clerk/clerk-js does not expose the future sign-in and sign-up state (its private state object), so useSignIn().signIn() and useSignUp().signUp() stay null. Upgrade @clerk/clerk-js to 6.38.1 or later; the custom flow API needs it.";
+const MISSING_STATE = __DEV__
+  ? "@clerk/clerk-js does not expose the future sign-in and sign-up state (its private state object), so useSignIn().signIn() and useSignUp().signUp() stay null. Upgrade @clerk/clerk-js to 6.38.1 or later; the custom flow API needs it."
+  : "CLERK_FUTURE_2";
 
 /**
  * Creates a mirror that calls `mirror` with both flows on every clerk-js change.

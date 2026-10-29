@@ -176,7 +176,9 @@ function flowOf<R>(
     if (guard(resource)) checked = resource;
     else
       problem(
-        `clerk-js handed over a ${key} resource without the future methods this package uses. The ${key} is null. Upgrade @clerk/clerk-js to a release with the future custom-flow API (6.38.1 or later is what this package is tested with).`,
+        __DEV__
+          ? `clerk-js handed over a ${key} resource without the future methods this package uses. The ${key} is null. Upgrade @clerk/clerk-js to a release with the future custom-flow API (6.38.1 or later is what this package is tested with).`
+          : `CLERK_FUTURE_1 ${key}`,
       );
   }
   return {

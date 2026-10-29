@@ -72,8 +72,24 @@ export function withAnswerHeaders(response: Response, answer: Headers): Response
     if (name !== "set-cookie" && name.startsWith("x-clerk-")) extra.push([name, value]);
   }
   if (cookies.length === 0 && extra.length === 0) return response;
+  if (response.status < 200 || response.status > 599) return setInPlace(response, extra, cookies);
   const out = new Response(response.body, response);
   for (const [name, value] of extra) out.headers.set(name, value);
   for (const cookie of cookies) out.headers.append("set-cookie", cookie);
   return out;
+}
+
+/** Sets the headers on a response that cannot be copied. Immutable headers (a `TypeError`) leave it as it is. */
+function setInPlace(
+  response: Response,
+  extra: ReadonlyArray<[string, string]>,
+  cookies: readonly string[],
+): Response {
+  try {
+    for (const [name, value] of extra) response.headers.set(name, value);
+    for (const cookie of cookies) response.headers.append("set-cookie", cookie);
+  } catch (error) {
+    if (!(error instanceof TypeError)) throw error;
+  }
+  return response;
 }

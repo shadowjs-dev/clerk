@@ -265,6 +265,20 @@ and the package is built. Otherwise each of these is skipped, and the test title
 - [Convex package](https://convex.shadowjs.net).
 - Clerk documentation: https://clerk.com/docs
 
+## Production error codes
+
+A production build keeps a short code instead of the development explanation, so message text never reaches user bundles. Search this table for the code. In the explanation, `…` stands for a value the development message names. A code followed by a word names the option, feature or member at fault.
+
+| Code | Development explanation |
+| --- | --- |
+| `CLERK_FUTURE_1` | clerk-js handed over a … resource without the future methods this package uses. The … is null. Upgrade @clerk/clerk-js to a release with the future custom-flow API (6.38.1 or later is what this package is tested with). |
+| `CLERK_FUTURE_2` | @clerk/clerk-js does not expose the future sign-in and sign-up state (its private state object), so useSignIn().signIn() and useSignUp().signUp() stay null. Upgrade @clerk/clerk-js to 6.38.1 or later; the custom flow API needs it. |
+| `CLERK_KEY` | publishableKey does not name a Clerk frontend API. Copy the key again from the Clerk dashboard. |
+| `CLERK_MODE` | mode must be "script" or "bundled". |
+| `CLERK_URL_1` | … is not a valid URL. |
+| `CLERK_URL_2` | … must be https (http only for localhost). |
+| `CLERK_VERSION` | … must be a version such as "6" or "6.38.1". |
+
 ## Dependencies
 
 - Runtime: none.
