@@ -28,8 +28,7 @@ The default `script` mode needs nothing else: the provider loads Clerk's bundles
 key. The `bundled` mode (`<ClerkProvider mode="bundled">`, for offline and strict-CSP apps) also needs `npm install
 @clerk/clerk-js @clerk/ui react react-dom`, because `clerk.load()` needs a UI bundle and `@clerk/ui` renders with React.
 `@clerk/backend` is needed only if you use `@shadow-js/clerk/server`. `@shadow-js/core` and
-`@shadow-js/web` are peer dependencies. ShadowJS 1.0.0 is not on npm yet; until it is published,
-install the packages from this repository's workspace.
+`@shadow-js/web` are peer dependencies.
 
 ## Example
 
@@ -188,7 +187,7 @@ thrown to the nearest `ErrorBoundary`, and its reset retries.
 
 ## API
 
-Two entries: `@shadow-js/clerk` (client) and `@shadow-js/clerk/server` (server only).
+Three entries: `@shadow-js/clerk` (client), `@shadow-js/clerk/server` (server only) and `@shadow-js/clerk/convex` (the Convex provider).
 
 | Export | Description |
 | --- | --- |
@@ -250,13 +249,13 @@ export async function handleRequest(request: Request): Promise<Response> {
 `@shadow-js/clerk/server` uses Web APIs only, so it runs on Node (22.12 and later), Bun, Deno and Cloudflare Workers.
 The runtime tests run the same checks in each one (webhook verification, the route matcher and the error class). Bun runs
 when `bun` is on the PATH. Cloudflare Workers runs on the workerd that `wrangler` ships. Deno runs when `deno` is on the PATH
-and the package is built. Otherwise each of these is skipped, and the test title says why.
+and the package is built. Otherwise the test fails and says what to install.
 
 ## Notes
 
 - `user()` is typed as `ClerkUserLike` (the id and the organization memberships). At run time it is
   Clerk's full user resource; narrow the value to read other fields.
-- The UI components and buttons render nothing on the server; their mount happens on the client.
+- On the server the UI components send an empty keyed `<div>` and the buttons send their markup with a hydration key; Clerk mounts its own form on the client.
 - `getToken` resolves `null` when there is no active session, after sign-out, and when the session
   changed while the token was being fetched. A rejected request rejects the promise.
 
@@ -282,7 +281,8 @@ A production build keeps a short code instead of the development explanation, so
 ## Dependencies
 
 - Runtime: none.
-- Peers: `@shadow-js/core` and `@shadow-js/web` `^1.0.0`: the runtime and rendering the auth components use.
+- Peers: `@shadow-js/core` and `@shadow-js/web` `^1.0.3`: the runtime and rendering the auth components use.
+- Optional peer: `@shadow-js/convex` `^1.0.3`, only for `@shadow-js/clerk/convex`.
 - Optional peers: `@clerk/clerk-js` `>=5`, `@clerk/ui` `>=1.39.1`, `@clerk/backend` `>=2`: the browser SDK, the prebuilt UI (`src/provider.ts`), and server session checks (`src/server/authenticate.ts`).
 
 ## Types
