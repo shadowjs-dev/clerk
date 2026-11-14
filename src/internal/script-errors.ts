@@ -71,3 +71,13 @@ export function uiPackageError(cause: unknown): Error {
 export function missingGlobalError(): Error {
   return new Error("Clerk's script did not define window.Clerk.");
 }
+
+/**
+ * The error of a Clerk component, modal button or `useClerkUi().load()` under `loadUi="never"`.
+ * @internal
+ */
+export function uiNeverError(): Error {
+  return new Error(
+    'Clerk\'s UI bundle was asked for, and <ClerkProvider loadUi="never"> does not load it. Use loadUi="lazy" (or leave the default) to load it when a component, a modal button or a re-verification needs it.',
+  );
+}

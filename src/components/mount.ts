@@ -34,23 +34,41 @@ export function mountClerkUi(name: string, props: object, spec: MountSpec): unkn
   if (isServer) return serverPlaceholder();
   const node = clientPlaceholder("div");
   let mountedWith: ClerkLike | null = null;
+  /** Counts the runs of the effect; a mount that waited for the UI bundle checks that no later run or disposal came first. */
+  let run = 0;
 
   useEffect(() => {
     const clerk = ctx.clerk();
     if (clerk === null) return;
     const options: ClerkUiOptions = readOptions(props, []);
-    // Only a node that Clerk has mounted into is recorded: a mount that throws (for example, an older clerk-js
-    // without the method) must not be unmounted later. A replaced instance is cleared before its unmount runs.
-    if (mountedWith !== null && mountedWith !== clerk) {
-      const previous = mountedWith;
-      mountedWith = null;
-      spec.unmount(previous, node);
+    run += 1;
+    const mine = run;
+    const mountNow = (): void => {
+      // Only a node that Clerk has mounted into is recorded: a mount that throws (for example, an older clerk-js
+      // without the method) must not be unmounted later. A replaced instance is cleared before its unmount runs.
+      if (mountedWith !== null && mountedWith !== clerk) {
+        const previous = mountedWith;
+        mountedWith = null;
+        spec.unmount(previous, node);
+      }
+      spec.mount(clerk, node, options);
+      mountedWith = clerk;
+    };
+    // The components are Clerk's UI: a provider that deferred the bundle (`loadUi="lazy"`) loads it first.
+    if (ctx.uiReady()) {
+      mountNow();
+      return;
     }
-    spec.mount(clerk, node, options);
-    mountedWith = clerk;
+    ctx
+      .loadUi()
+      .then(() => {
+        if (mine === run) mountNow();
+      })
+      .catch(ctx.fail);
   });
 
   onCleanup(() => {
+    run += 1;
     if (mountedWith !== null) spec.unmount(mountedWith, node);
     mountedWith = null;
   });

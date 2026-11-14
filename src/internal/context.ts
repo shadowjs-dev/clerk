@@ -40,6 +40,13 @@ export interface ClerkContextValue {
   readonly signUp: Accessor<ClerkFlowSnapshot<ClerkSignUpFuture>>;
   /** Routes an error to the nearest ErrorBoundary by throwing it from the provider's subtree. */
   readonly fail: (error: unknown) => void;
+  /** True when Clerk's components can open now: the UI bundle is loaded, or this provider does not defer it. Not reactive. */
+  readonly uiReady: () => boolean;
+  /**
+   * Loads the UI bundle when the provider deferred it (`loadUi="lazy"`). Resolves at once when it is loaded or was never
+   * deferred, and rejects for `loadUi="never"` and for a bundle that fails to load.
+   */
+  readonly loadUi: () => Promise<void>;
 }
 
 /**

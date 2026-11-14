@@ -12,8 +12,9 @@ import { attempt } from "./internal/actions";
 import { ClerkContext, type ClerkContextValue } from "./internal/context";
 import { createFlowMirror, EMPTY_FLOWS } from "./internal/flow-mirror";
 import { checkPublishableKey, syncChannelName } from "./internal/keys";
+import type { LazyUi } from "./internal/lazy-ui";
 import { importClerkConstructor, importClerkUi, loadInstance, withClerkUi } from "./internal/load";
-import { loadClerkScripts, type ScriptOverrides } from "./internal/script";
+import { loadClerkScripts, loadClerkUiScript, type ScriptOverrides } from "./internal/script";
 import { createSessionSync, type SessionSync } from "./internal/session-sync";
 import type {
   ClerkClientLike,
@@ -43,6 +44,24 @@ import type {
 export type ClerkProviderMode = "script" | "bundled";
 
 /**
+ * When the provider loads Clerk's UI bundle (`ui.browser.js` in script mode, `@clerk/ui` in bundled mode), the code of
+ * the components (`<SignIn>`, `<UserButton>`, the modal buttons, the re-verification dialog).
+ *
+ * - `"eager"` (default): with the SDK. `clerk.load()` waits for it, so the signed-in state is known after both have
+ *   loaded.
+ * - `"lazy"`: the SDK loads and `clerk.load()` runs without the UI bundle, so the state is known as soon as the SDK has
+ *   loaded. The bundle loads when a Clerk component mounts, a modal button is clicked, a re-verification opens, or the
+ *   app calls `useClerkUi().load()`. An app that opens Clerk's dialogs through `useClerk()` calls `load()` first.
+ * - `"never"`: the bundle is not loaded at all. For an app that builds its own flows with `useSignIn()` and
+ *   `HandleSSOCallback`; a Clerk component, a modal button or `useClerkUi().load()` then fails with an error that names
+ *   this prop.
+ *
+ * Ignored with the `clerk` prop (an injected instance brings its own UI).
+ * @since 1.0.6
+ */
+export type ClerkUiLoading = "eager" | "lazy" | "never";
+
+/**
  * Props of {@link ClerkProvider}. The script URL overrides (`clerkJSUrl`, `clerkJSVersion`, `clerkUIUrl`,
  * `clerkUIVersion`) apply to script mode only.
  * @since 1.0.0
@@ -68,6 +87,13 @@ export interface ClerkProviderProps extends ScriptOverrides {
    */
   readonly mode?: ClerkProviderMode | undefined;
   /**
+   * When Clerk's UI bundle loads, see {@link ClerkUiLoading}. Any other value throws a `TypeError` when the provider
+   * renders.
+   * @default "eager"
+   * @since 1.0.6
+   */
+  readonly loadUi?: ClerkUiLoading | undefined;
+  /**
    * The nonce of the page's Content Security Policy. Written to the Clerk script elements (script
    * mode) so a `script-src` with `'nonce-...'` allows them. Pass the value your server wrote. An empty string
    * writes no nonce.
@@ -88,6 +114,16 @@ function checkMode(mode: ClerkProviderMode | undefined): ClerkProviderMode {
   if (mode === undefined || mode === "script" || mode === "bundled") return mode ?? "script";
   throw new TypeError(
     __DEV__ ? 'ClerkProvider: mode must be "script" or "bundled".' : "CLERK_MODE",
+  );
+}
+
+/** The UI loading of the props, or the default. Anything else is a configuration mistake, reported before a load. */
+function checkLoadUi(value: ClerkUiLoading | undefined): ClerkUiLoading {
+  if (value === undefined || value === "eager" || value === "lazy" || value === "never") {
+    return value ?? "eager";
+  }
+  throw new TypeError(
+    __DEV__ ? 'ClerkProvider: loadUi must be "eager", "lazy" or "never".' : "CLERK_LOAD_UI",
   );
 }
 
@@ -133,6 +169,7 @@ function checkMode(mode: ClerkProviderMode | undefined): ClerkProviderMode {
 export function ClerkProvider(props: ClerkProviderProps): unknown {
   const publishableKey = checkPublishableKey(props.publishableKey);
   const mode = checkMode(props.mode);
+  const loadUi = checkLoadUi(props.loadUi);
 
   const [instance, setInstance] = useSignal<ClerkLike | null>(null);
   const [loaded, setLoaded] = useSignal(false);
@@ -226,6 +263,41 @@ export function ClerkProvider(props: ClerkProviderProps): unknown {
   /** Aborts the Clerk script loads of this provider when it is disposed. Created on mount. */
   let scripts: AbortController | undefined;
 
+  /**
+   * The deferred UI bundle (`loadUi="lazy"` with a provider-loaded Clerk). The loader reads the abort signal when it
+   * runs, which is after mount, so a bundle that is asked for and then abandoned stops with the provider.
+   */
+  const scriptOptions = (signal: AbortSignal) => ({
+    publishableKey,
+    nonce: props.nonce,
+    timeoutMs: props.scriptLoadTimeout,
+    clerkJSUrl: props.clerkJSUrl,
+    clerkJSVersion: props.clerkJSVersion,
+    clerkUIUrl: props.clerkUIUrl,
+    clerkUIVersion: props.clerkUIVersion,
+    signal,
+  });
+  /**
+   * Created before the SDK is attached, from its own chunk, so an app on the default `"eager"` carries none of it. The
+   * loader reads the abort signal when it runs, so a bundle that is asked for and then abandoned stops with the provider.
+   */
+  let lazyUi: LazyUi | undefined;
+  const prepareLazyUi = (): Promise<unknown> =>
+    loadUi !== "lazy"
+      ? Promise.resolve()
+      : import("./internal/lazy-ui").then((module) => {
+          lazyUi = module.createLazyUi(() =>
+            mode === "bundled"
+              ? importClerkUi()
+              : loadClerkUiScript(scriptOptions(scripts?.signal ?? new AbortController().signal)),
+          );
+        });
+  /** What `clerk.load()` gets as the UI options: the bundle, a promise of it, or nothing. */
+  const uiOptions = (loaded: unknown): ClerkLoadOptions | undefined =>
+    loadUi === "never"
+      ? props.loadOptions
+      : withClerkUi(props.loadOptions, lazyUi?.ClerkUI ?? loaded);
+
   const start = (signal: AbortSignal): void => {
     const injected = props.clerk;
     if (injected !== undefined) {
@@ -234,27 +306,21 @@ export function ClerkProvider(props: ClerkProviderProps): unknown {
       return;
     }
     if (mode === "bundled") {
-      Promise.all([importClerkConstructor(), importClerkUi()]).then(([Clerk, ClerkUI]) => {
+      Promise.all([
+        importClerkConstructor(),
+        loadUi === "eager" ? importClerkUi() : prepareLazyUi(),
+      ]).then(([Clerk, ClerkUI]) => {
         if (disposed) return;
-        attempt(
-          () => attach(new Clerk(publishableKey), withClerkUi(props.loadOptions, ClerkUI)),
-          fail,
-        );
+        attempt(() => attach(new Clerk(publishableKey), uiOptions(ClerkUI)), fail);
       }, fail);
       return;
     }
-    loadClerkScripts({
-      publishableKey,
-      nonce: props.nonce,
-      timeoutMs: props.scriptLoadTimeout,
-      clerkJSUrl: props.clerkJSUrl,
-      clerkJSVersion: props.clerkJSVersion,
-      clerkUIUrl: props.clerkUIUrl,
-      clerkUIVersion: props.clerkUIVersion,
-      signal,
-    }).then(({ clerk, ClerkUI }) => {
+    Promise.all([
+      loadClerkScripts({ ...scriptOptions(signal), ui: loadUi === "eager" }),
+      prepareLazyUi(),
+    ]).then(([{ clerk, ClerkUI }]) => {
       if (disposed) return;
-      attempt(() => attach(clerk, withClerkUi(props.loadOptions, ClerkUI)), fail);
+      attempt(() => attach(clerk, uiOptions(ClerkUI)), fail);
     }, fail);
   };
 
@@ -303,6 +369,14 @@ export function ClerkProvider(props: ClerkProviderProps): unknown {
     signIn,
     signUp,
     fail,
+    uiReady: () => loadUi === "eager" || props.clerk !== undefined || (lazyUi?.ready() ?? false),
+    loadUi: () => {
+      if (props.clerk !== undefined || loadUi === "eager") return Promise.resolve();
+      if (lazyUi !== undefined) return lazyUi.load();
+      return import("./internal/script-errors").then((texts) => {
+        throw texts.uiNeverError();
+      });
+    },
   };
 
   // A failure is thrown from an effect owned by the provider, so the nearest ErrorBoundary catches

@@ -1,6 +1,10 @@
 import { createClerkClient } from "@clerk/backend";
 import { answerHeaders } from "./handshake";
-import { frontendOriginOf, handshakeTargetAllowed } from "./handshake-check";
+import {
+  frontendOriginOf,
+  handshakeTargetAllowed,
+  resolvedLocationAllowed,
+} from "./handshake-check";
 import { type ClerkServerOptions, checkServerOptions } from "./options";
 import { admit } from "./request-guard";
 
@@ -113,6 +117,15 @@ export async function authenticateRequest(
     // The backend can be told, by the request alone, to redirect elsewhere (a development instance follows
     // `__clerk_redirect_url`; the redirect URL is built from `X-Forwarded-Host`). Only Clerk's frontend API gets
     // a handshake, and only for an origin the application listed.
+    return signedOutAuth("handshake-refused");
+  }
+  const resolved = state.status === "handshake" ? null : state.headers.get("location");
+  if (
+    resolved !== null &&
+    !resolvedLocationAllowed(resolved, request.url, checked.authorizedParties)
+  ) {
+    // A development handshake that was resolved asks for a redirect to the URL without its parameters; one that leaves the
+    // origin is not followed, and its cookies are not sent.
     return signedOutAuth("handshake-refused");
   }
   const auth = state.toAuth();

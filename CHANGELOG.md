@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.6
+
+### Added
+
+- `ClerkProvider` takes `loadUi`: `"eager"` (default, as before), `"lazy"` (the SDK loads and `clerk.load()` runs without Clerk's UI bundle, which loads when a Clerk component mounts, a modal button is clicked, a re-verification opens or `useClerkUi().load()` is called) or `"never"` (no UI bundle; custom flows only). In `"lazy"` mode the signed-in state is known as soon as the SDK has loaded. `useClerkUi()` returns `{ load(), ready() }` for opening Clerk's dialogs through `useClerk()`.
+
+### Fixed
+
+- `clerkMiddleware` follows a resolved development handshake: a `signed-in` or `signed-out` outcome that carries a `Location` (the request URL without `__clerk_handshake` and the other handshake parameters) is answered with a `307` to it, with `cache-control: no-store` and the cookies, before the route and `protect` run, as `@clerk/nextjs` does. Before, the route ran on the URL that still had the stale token, and a `protect` redirect to sign-in with that URL as `redirect_url` looped. A location outside the request's origin and `authorizedParties` is refused (`handshake-refused`).
+
 ## 1.0.5
 
 ### Changed

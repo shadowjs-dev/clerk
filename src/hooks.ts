@@ -76,6 +76,55 @@ export function useClerk(): Accessor<ClerkLike | null> {
   return requireContext("useClerk").clerk;
 }
 
+/**
+ * What {@link useClerkUi} returns: the loading of Clerk's UI bundle, for a provider that defers it (`loadUi="lazy"`).
+ * @since 1.0.6
+ */
+export interface ClerkUiHandle {
+  /**
+   * Loads the UI bundle if the provider deferred it, and resolves when Clerk's components can open. Several calls share
+   * one load, and a call after the bundle has arrived resolves at once. It also resolves at once under the default
+   * (`"eager"`) and with an injected `clerk`. It rejects for `loadUi="never"`, and with the script's error when the
+   * bundle fails to load (the next call tries again).
+   */
+  load(): Promise<void>;
+  /** True when Clerk's components can open now. Not reactive: read it in an event handler. */
+  ready(): boolean;
+}
+
+/**
+ * The UI bundle of the provider's Clerk. Call `load()` before opening one of Clerk's dialogs with `useClerk()` directly
+ * (`clerk.openGoogleOneTap()`, `clerk.openSignIn()`) when the provider has `loadUi="lazy"`; the components and modal
+ * buttons of this package, and `useReverification`, do it themselves.
+ *
+ * @returns The handle described by {@link ClerkUiHandle}.
+ * @throws Error `useClerkUi must be used inside <ClerkProvider>.` when called outside a `ClerkProvider`.
+ * @example
+ * ```tsx
+ * import { useClerk, useClerkUi } from "@shadow-js/clerk";
+ *
+ * export function OpenSignIn() {
+ *   const clerk = useClerk();
+ *   const ui = useClerkUi();
+ *   const open = async (): Promise<void> => {
+ *     await ui.load();
+ *     clerk()?.openSignIn();
+ *   };
+ *   return (
+ *     <button type="button" onClick={() => void open()}>
+ *       Sign in
+ *     </button>
+ *   );
+ * }
+ * ```
+ * @see {@link ClerkProvider}
+ * @since 1.0.6
+ */
+export function useClerkUi(): ClerkUiHandle {
+  const ctx = requireContext("useClerkUi");
+  return { load: ctx.loadUi, ready: ctx.uiReady };
+}
+
 /** The levels a re-verification can require (Clerk's names). */
 const LEVELS: ReadonlySet<string> = new Set(["first_factor", "second_factor", "multi_factor"]);
 /** Clerk's named policies, as the server sends them in a hint. */
@@ -228,10 +277,13 @@ export function useReverification<A extends readonly unknown[], R>(
   fetcher: (...args: A) => R,
 ): (...args: A) => Promise<Awaited<R>> {
   const clerk = useClerk();
+  const ctx = requireContext("useReverification");
   const run = async (...args: A): Promise<unknown> => {
     let answer = await settle(() => fetcher(...args));
     if (isReverificationHint(answer.hint)) {
       const reverification = fieldOf(fieldOf(answer.hint, "clerk_error"), "metadata");
+      // The dialog is Clerk's UI: a provider that deferred the bundle loads it now.
+      await ctx.loadUi();
       await requestVerification(
         untrack(() => clerk()),
         levelOf(fieldOf(reverification, "reverification")),
@@ -550,7 +602,7 @@ export interface SignInState {
  *   return (
  *     <div>
  *       <button type="button" disabled={signIn.signIn() === null} onClick={() => void start()}>
- *         Continue with Google
+ *         Sign in
  *       </button>
  *       <p role="alert">{signIn.errors().global?.[0]?.message}</p>
  *     </div>

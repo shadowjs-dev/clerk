@@ -47,6 +47,7 @@ function actionButton(
   children: unknown,
   label: string,
   run: (clerk: ClerkLike) => unknown,
+  needsUi: () => boolean = () => false,
 ): unknown {
   if (isServer) {
     // An element child arrives on the server as markup already; text or no child needs a button.
@@ -58,6 +59,8 @@ function actionButton(
     attempt(() => {
       const clerk = ctx.clerk();
       if (clerk === null) return undefined;
+      // A dialog is Clerk's UI: a provider that deferred the bundle loads it before the click opens anything.
+      if (needsUi() && !ctx.uiReady()) return ctx.loadUi().then(() => run(clerk));
       return run(clerk);
     }, ctx.fail);
   };
@@ -108,10 +111,18 @@ function buttonFor(child: unknown, label: string): HTMLElement {
 export function SignInButton(props: AuthButtonProps): unknown {
   const ctx = requireContext("SignInButton");
   const children = untrack(() => props.children);
-  return actionButton(ctx, children, "Sign in", (clerk) => {
-    const options = readOptions(props, ["children", "mode"]);
-    return props.mode === "redirect" ? clerk.redirectToSignIn(options) : clerk.openSignIn(options);
-  });
+  return actionButton(
+    ctx,
+    children,
+    "Sign in",
+    (clerk) => {
+      const options = readOptions(props, ["children", "mode"]);
+      return props.mode === "redirect"
+        ? clerk.redirectToSignIn(options)
+        : clerk.openSignIn(options);
+    },
+    () => props.mode !== "redirect",
+  );
 }
 
 /**
@@ -140,10 +151,18 @@ export function SignInButton(props: AuthButtonProps): unknown {
 export function SignUpButton(props: AuthButtonProps): unknown {
   const ctx = requireContext("SignUpButton");
   const children = untrack(() => props.children);
-  return actionButton(ctx, children, "Sign up", (clerk) => {
-    const options = readOptions(props, ["children", "mode"]);
-    return props.mode === "redirect" ? clerk.redirectToSignUp(options) : clerk.openSignUp(options);
-  });
+  return actionButton(
+    ctx,
+    children,
+    "Sign up",
+    (clerk) => {
+      const options = readOptions(props, ["children", "mode"]);
+      return props.mode === "redirect"
+        ? clerk.redirectToSignUp(options)
+        : clerk.openSignUp(options);
+    },
+    () => props.mode !== "redirect",
+  );
 }
 
 /**

@@ -44,6 +44,7 @@ export type { ClerkConvexAuthOptions, ConvexAuthState } from "./convex";
 export { clerkConvexAuth } from "./convex";
 export type {
   AuthState,
+  ClerkUiHandle,
   OrganizationListState,
   OrganizationState,
   SessionState,
@@ -54,6 +55,7 @@ export type {
 export {
   useAuth,
   useClerk,
+  useClerkUi,
   useOrganization,
   useOrganizationList,
   useReverification,
@@ -62,7 +64,7 @@ export {
   useSignUp,
   useUser,
 } from "./hooks";
-export type { ClerkProviderMode, ClerkProviderProps } from "./provider";
+export type { ClerkProviderMode, ClerkProviderProps, ClerkUiLoading } from "./provider";
 export { ClerkProvider } from "./provider";
 export type {
   ClerkAttemptLike,

@@ -151,6 +151,12 @@ function windowGlobal(name: string): unknown {
 /** The inputs of {@link loadClerkScripts}. */
 export interface ScriptLoadOptions extends ScriptOverrides {
   readonly publishableKey: string;
+  /**
+   * Whether `ui.browser.js` loads with the SDK and the result waits for it. `false` loads the SDK only; the UI bundle
+   * is then loaded by {@link loadClerkUiScript} when something asks for it.
+   * @default true
+   */
+  readonly ui?: boolean | undefined;
   /** Written to both script elements, so a strict `script-src` with a nonce allows them. */
   readonly nonce?: string | undefined;
   /** How long each script may take, in milliseconds. */
@@ -162,6 +168,7 @@ export interface ScriptLoadOptions extends ScriptOverrides {
 /** What the script mode hands the provider: the instance clerk.browser.js created and the UI constructor. */
 export interface LoadedClerk {
   readonly clerk: ClerkLike;
+  /** The UI constructor, or `undefined` when the load was asked to leave the UI bundle out (`ui: false`). */
   readonly ClerkUI: unknown;
 }
 
@@ -185,9 +192,11 @@ export async function loadClerkScripts(options: ScriptLoadOptions): Promise<Load
     timeoutMs: options.timeoutMs ?? DEFAULT_SCRIPT_TIMEOUT_MS,
     signal: options.signal,
   };
-  // Both URLs are checked before either script is inserted: a bad second URL must not leave the first one loading.
+  const withUi = options.ui !== false;
+  // Both URLs are checked before either script is inserted: a bad second URL must not leave the first one loading. A
+  // deferred UI bundle is checked when it is asked for.
   const jsUrl = httpUrl("clerkJSUrl", clerkJSScriptUrl(host, options));
-  const uiUrl = httpUrl("clerkUIUrl", clerkUIScriptUrl(host, options));
+  const uiUrl = withUi ? httpUrl("clerkUIUrl", clerkUIScriptUrl(host, options)) : undefined;
   await Promise.all([
     ensureScript({
       ...shared,
@@ -197,14 +206,7 @@ export async function loadClerkScripts(options: ScriptLoadOptions): Promise<Load
       attributes: { "data-clerk-publishable-key": options.publishableKey },
       ready: () => isClerkLike(windowGlobal("Clerk")),
     }),
-    ensureScript({
-      ...shared,
-      marker: "data-clerk-ui-script",
-      label: "ui.browser.js",
-      url: uiUrl,
-      attributes: {},
-      ready: () => scriptClerkUI() !== undefined,
-    }),
+    uiUrl === undefined ? undefined : ensureScript(uiSpec(shared, uiUrl)),
   ]);
   const clerk = windowGlobal("Clerk");
   if (!isClerkLike(clerk)) throw (await import("./script-errors")).missingGlobalError();
@@ -214,7 +216,46 @@ export async function loadClerkScripts(options: ScriptLoadOptions): Promise<Load
     const texts = await import("./script-errors");
     throw texts.otherKeyError();
   }
-  return { clerk, ClerkUI: scriptClerkUI() };
+  return { clerk, ClerkUI: withUi ? scriptClerkUI() : undefined };
+}
+
+/** `ui.browser.js` as a script to load: the element is shared with every copy of this package on the page. */
+function uiSpec(
+  shared: Pick<ScriptSpec, "nonce" | "timeoutMs" | "signal">,
+  url: string,
+): ScriptSpec {
+  return {
+    ...shared,
+    marker: "data-clerk-ui-script",
+    label: "ui.browser.js",
+    url,
+    attributes: {},
+    ready: () => scriptClerkUI() !== undefined,
+  };
+}
+
+/**
+ * Loads `ui.browser.js` alone, for a provider that deferred it (`loadUi="lazy"`), and returns the UI constructor it
+ * defines. The same element, retry, timeout and nonce as in {@link loadClerkScripts}.
+ * @param options The key (for the host), the URL overrides, the nonce, the timeout and the abort signal.
+ * @returns The UI constructor, once its global is defined.
+ * @throws {Error} When the script fails to load, or does not define its global, after one retry.
+ * @internal
+ */
+export async function loadClerkUiScript(options: ScriptLoadOptions): Promise<unknown> {
+  const host = frontendApiOf(options.publishableKey);
+  const url = httpUrl("clerkUIUrl", clerkUIScriptUrl(host, options));
+  await ensureScript(
+    uiSpec(
+      {
+        nonce: options.nonce,
+        timeoutMs: options.timeoutMs ?? DEFAULT_SCRIPT_TIMEOUT_MS,
+        signal: options.signal,
+      },
+      url,
+    ),
+  );
+  return scriptClerkUI();
 }
 
 /**

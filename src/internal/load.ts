@@ -11,8 +11,9 @@ export function importClerkConstructor(): Promise<ClerkConstructor> {
 }
 
 /**
- * Loads the UI bundle of `@clerk/ui` for the `bundled` mode. `clerk.load()` refuses to finish without
- * it ("Clerk was not loaded with Ui components"), so every mounted Clerk component depends on it. The
+ * Loads the UI bundle of `@clerk/ui` for the `bundled` mode. A Clerk component, a dialog or the
+ * re-verification opens only on a Clerk that was loaded with it ("Clerk was not loaded with Ui components");
+ * `clerk.load()` itself finishes without it, which is what `loadUi="lazy"` and `"never"` rely on. The
  * package is an optional peer; a missing one is reported by name.
  * @internal
  */

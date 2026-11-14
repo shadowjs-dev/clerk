@@ -57,3 +57,33 @@ export function handshakeTargetAllowed(
     throw error;
   }
 }
+
+/**
+ * Whether the redirect of a resolved development handshake may be sent. After `?__clerk_handshake=...` on a development
+ * instance the backend answers `signed-in` or `signed-out` with the session cookies and a `Location`: the same URL without
+ * the handshake parameters. The location is resolved against the request. It must stay on the origin of the request, or on
+ * an origin the application listed in `authorizedParties`; a `Location` that leaves them (the backend builds it from
+ * headers a proxy may have passed on from the client) is not followed. A scheme that is not http(s) has the origin
+ * `"null"`, which is neither.
+ *
+ * @param location The `location` header of the outcome.
+ * @param requestUrl The URL of the request.
+ * @param parties The `authorizedParties` option.
+ * @returns True when the redirect may be sent.
+ * @internal
+ */
+export function resolvedLocationAllowed(
+  location: string,
+  requestUrl: string,
+  parties: readonly string[] | false | undefined,
+): boolean {
+  try {
+    const target = new URL(location, requestUrl);
+    if (target.origin === new URL(requestUrl).origin) return true;
+    return parties !== undefined && parties !== false && parties.includes(target.origin);
+  } catch (error) {
+    // `new URL` throws a TypeError for text that is not a URL: such a redirect is refused.
+    if (error instanceof TypeError) return false;
+    throw error;
+  }
+}

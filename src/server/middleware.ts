@@ -61,8 +61,10 @@ const authByEvent = new WeakMap<object, ServerAuth>();
  * The answer follows `@clerk/backend`:
  * - `handshake` (an expired session cookie the browser can refresh): a `307` to Clerk's handshake URL
  *   with the cookies Clerk sets, and the inner handlers do not run. Clerk sends the browser back to the
- *   same URL with the refreshed session.
- * - `signed-in` and `signed-out`: the inner handlers run, and Clerk's `x-clerk-*` status headers and any
+ *   same URL with the refreshed session. A development handshake that `@clerk/backend` resolved (`signed-in` or
+ *   `signed-out` with a `Location`: the URL without the `__clerk_handshake` parameters) is answered the same way, as
+ *   `@clerk/nextjs` does; a location outside the request's origin and `authorizedParties` is refused.
+ * - `signed-in` and `signed-out` without a location: the inner handlers run, and Clerk's `x-clerk-*` status headers and any
  *   refreshed session cookies are added to their response. The session token is never sent to the browser.
  *
  * It never blocks a request on its own, except through `protect` (see {@link ClerkMiddlewareOptions}); the

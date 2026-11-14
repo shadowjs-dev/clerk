@@ -37,17 +37,18 @@ export function answerHeaders(source: Headers): Headers {
 }
 
 /**
- * The redirect that starts or completes a handshake: a `307` to Clerk's handshake URL (the same method is
- * kept, so a POST is not turned into a GET), with `cache-control: no-store` and the cookies Clerk sets.
- * Returns `undefined` when the outcome is not a handshake or Clerk gave no location, so the caller treats
- * the request as signed out instead of answering nothing.
+ * The redirect that starts or completes a handshake: a `307` to the location Clerk gave (the same method is kept, so a POST
+ * is not turned into a GET), with `cache-control: no-store` and the cookies Clerk sets. It is the answer to a `handshake`
+ * outcome (Clerk's handshake URL), and to a `signed-in` or `signed-out` outcome that carries a location: a development
+ * handshake that was resolved asks the browser to come back to the same URL without the handshake parameters, as
+ * `@clerk/nextjs` does, and the handlers must not run on the URL that still has them. Returns `undefined` when Clerk gave
+ * no location, so the caller treats the request as it is (signed out for a handshake, or as the outcome says).
  *
  * @param auth The authentication outcome.
  * @returns The 307 response, or undefined.
  * @internal
  */
 export function handshakeResponse(auth: AnswerSource): Response | undefined {
-  if (auth.status !== "handshake") return undefined;
   const location = auth.headers.get("location");
   if (location === null) return undefined;
   const headers = new Headers({ location, "cache-control": "no-store" });
