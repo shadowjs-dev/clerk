@@ -68,10 +68,10 @@
     }
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.15",
-    "@clerk/backend": "3.23.1",
-    "@clerk/clerk-js": "6.38.1",
-    "@clerk/ui": "1.39.1",
+    "@biomejs/biome": "2.6.6",
+    "@clerk/backend": "3.27.0",
+    "@clerk/clerk-js": "6.42.3",
+    "@clerk/ui": "1.42.4",
     "@shadow-js/compiler": "^1.0.6",
     "@shadow-js/convex": "^1.0.6",
     "@shadow-js/core": "^1.0.6",
@@ -80,13 +80,13 @@
     "@shadow-js/web": "^1.0.6",
     "@testing-library/dom": "10.4.2",
     "@types/node": "^24.0.0",
-    "esbuild": "0.27.0",
+    "esbuild": "0.28.2",
     "fast-check": "^4.10.2",
     "happy-dom": "21.0.4",
-    "tsdown": "0.23.0",
+    "tsdown": "0.23.7",
     "typescript": "7.0.2",
-    "vite": "8.3.3",
-    "vitest": "5.0.3"
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
   },
   "homepage": "https://clerk.shadowjs.net",
   "keywords": [
