@@ -1,6 +1,6 @@
 {
   "name": "@shadow-js/clerk",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Clerk authentication for your app, with a provider, hooks, UI components and server helpers",
   "license": "MIT",
   "type": "module",
@@ -49,9 +49,9 @@
     "@clerk/backend": ">=2",
     "@clerk/clerk-js": ">=5",
     "@clerk/ui": ">=1.39.1",
-    "@shadow-js/convex": "^1.1.0",
-    "@shadow-js/core": "^1.1.0",
-    "@shadow-js/web": "^1.1.0"
+    "@shadow-js/convex": "^1.1.1",
+    "@shadow-js/core": "^1.1.1",
+    "@shadow-js/web": "^1.1.1"
   },
   "peerDependenciesMeta": {
     "@clerk/backend": {
@@ -68,25 +68,25 @@
     }
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.15",
-    "@clerk/backend": "3.23.1",
-    "@clerk/clerk-js": "6.38.1",
-    "@clerk/ui": "1.39.1",
-    "@shadow-js/compiler": "^1.1.0",
-    "@shadow-js/convex": "^1.1.0",
-    "@shadow-js/core": "^1.1.0",
-    "@shadow-js/router": "^1.1.0",
-    "@shadow-js/testing": "^1.1.0",
-    "@shadow-js/web": "^1.1.0",
+    "@biomejs/biome": "2.6.6",
+    "@clerk/backend": "3.27.0",
+    "@clerk/clerk-js": "6.42.3",
+    "@clerk/ui": "1.42.4",
+    "@shadow-js/compiler": "^1.1.1",
+    "@shadow-js/convex": "^1.1.1",
+    "@shadow-js/core": "^1.1.1",
+    "@shadow-js/router": "^1.1.1",
+    "@shadow-js/testing": "^1.1.1",
+    "@shadow-js/web": "^1.1.1",
     "@testing-library/dom": "10.4.2",
     "@types/node": "^24.0.0",
-    "esbuild": "0.27.0",
+    "esbuild": "0.28.2",
     "fast-check": "^4.10.2",
     "happy-dom": "21.0.4",
-    "tsdown": "0.23.0",
+    "tsdown": "0.23.7",
     "typescript": "7.0.2",
     "vite": "8.3.3",
-    "vitest": "5.0.3"
+    "vitest": "5.1.0"
   },
   "homepage": "https://clerk.shadowjs.net",
   "keywords": [
