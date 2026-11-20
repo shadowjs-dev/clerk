@@ -281,8 +281,8 @@ For the errors in the table below, a production build keeps a short code instead
 ## Dependencies
 
 - Runtime: none.
-- Peers: `@shadow-js/core` and `@shadow-js/web` `^1.1.2`: the runtime and rendering the auth components use.
-- Optional peer: `@shadow-js/convex` `^1.1.2`, only for `@shadow-js/clerk/convex`.
+- Peers: `@shadow-js/core` and `@shadow-js/web` `^1.2.0`: the runtime and rendering the auth components use.
+- Optional peer: `@shadow-js/convex` `^1.2.0`, only for `@shadow-js/clerk/convex`.
 - Optional peers: `@clerk/clerk-js` `>=5`, `@clerk/ui` `>=1.39.1`, `@clerk/backend` `>=2`: the browser SDK, the prebuilt UI (`src/provider.ts`), and server session checks (`src/server/authenticate.ts`).
 
 ## Types
